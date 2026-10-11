@@ -1,48 +1,109 @@
-# ESPHome CasaFan Airfusion
+# ESPHome CasaFan Ceiling Fan Controller
 
-Contrôle d'un ventilateur de plafond **CasaFan Airfusion Climate LD-CD52BN** via **Home Assistant** (et Alexa), en remplaçant sa télécommande RF 434 MHz par un ESP32 + module CC1101, sous **ESPHome**.
+![ESPHome](https://img.shields.io/badge/ESPHome-compatible-000000?logo=esphome)
+![Home Assistant](https://img.shields.io/badge/Home%20Assistant-integration-18BCF2?logo=homeassistant&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## Objectif
+Control a **CasaFan Airfusion Climate LD-CD52BN** ceiling fan from **Home Assistant** (and Alexa) by replacing its original 434 MHz RF remote with an **ESP32** connected to a **CC1101** radio module, running **ESPHome**.
 
-Le ventilateur est piloté d'origine par une télécommande RF (RH787TG) en 434 MHz OOK. Ce projet reproduit ces trames depuis un ESP32 pour intégrer le ventilateur à Home Assistant sans dépendre du hub CasaFan.
+## Table of contents
 
-## Matériel
+- [Overview](#overview)
+- [Ceiling fan specifications](#ceiling-fan-specifications)
+- [Original remote control](#original-remote-control)
+- [Hardware](#hardware)
+- [Wiring](#wiring)
+- [RF protocol](#rf-protocol)
+- [Installation](#installation)
+- [Capturing the remote codes](#capturing-the-remote-codes)
+- [Home Assistant integration](#home-assistant-integration)
+- [License](#license)
 
-- ESP32 WROOM-32 DevKit (38 broches, CP2102, USB-C)
-- Module CC1101 EBYTE E07-M1101D-TH (antenne à ressort)
+## Overview
 
-## Câblage
+The fan is natively controlled by an RF remote (**RH787TG**) using 434 MHz OOK modulation.
 
-| CC1101 (E07-M1101D-TH) | ESP32 |
+This project reproduces the remote's RF frames from an ESP32, so the fan can be integrated into Home Assistant **without relying on the CasaFan hub**.
+
+## Ceiling fan specifications
+
+| | |
 |---|---|
-| GND (pin1) | GND |
-| VCC (pin2) | 3.3V |
-| GDO0 (pin3) | IO4 |
-| CSN (pin4) | IO5 |
-| SCK (pin5) | IO18 |
-| MOSI (pin6) | IO23 |
-| MISO (pin7) | IO19 |
-| GDO2 (pin8) | IO27 |
+| **Model** | Airfusion Climate LD-CD52BN (CasaFan / Lucci Air) |
+| **Receiver** | RH787RX |
+| **Motor controller** | RH788R |
+| **Frequency** | 434 MHz |
+| **Motor** | DC, 35 W |
+| **Voltage** | 220 V |
+| **Direction reversal** | Handled electronically by the controller |
 
-## Protocole RF décodé
+## Original remote control
 
-- Modulation OOK à 434 MHz
-- Bit 0 ≈ 310 µs, bit 1 ≈ 690 µs, pulse de synchro ≈ 1050 µs
-- Préfixe fixe (ID) sur 12 bits : `001010101011`
-- Les 9 commandes de la télécommande (ON/OFF, lumière, été/hiver, vitesses 1 à 6) ont été capturées et confirmées
+| | |
+|---|---|
+| **Reference** | RH787TG |
+| **DIP switches** | 4 micro-switches (SW1) |
+| **SET button** | 1 |
+| **Speed buttons** | 6 |
+| **Summer / winter** (rotation direction) button | 1 |
+| **Light button** | 1 |
+| **Stop button** | 1 |
 
-## État d'avancement
+That makes **9 distinct RF commands** in total.
 
-- ✅ Décodage RF complet et confirmé (réception testée, RSSI cohérent)
-- 🚧 Transmission en cours de mise au point : plusieurs approches testées (GDO0 manuel, FIFO/OOK, `remote_transmitter` ESPHome) sans succès sur le matériel précédent, suspecté endommagé
-- 🔜 Nouveau matériel commandé, re-test de la communication SPI puis de la transmission en cours
+## Hardware
+
+- [EBYTE **E07-M1101D-TH** CC1101 module (SMA antenna)](images/cc1101 TI sma.jpg) 
+- ESP32-C3 Super Mini** (16 pins, USB-C)
+
+## Wiring
+
+| CC1101 pin | Function | ESP32-C3 |
+|:---:|---|:---:|
+| 1 – GND | Ground | GND |
+| 2 – VCC | Power | 3V3 |
+| 3 – GDO0 | RF TX | GPIO7 |
+| 4 – CSN | Chip Select | GPIO3 |
+| 5 – SCK | SPI Clock | GPIO4 |
+| 6 – MOSI | SPI MOSI | GPIO6 |
+| 7 – MISO | SPI MISO | GPIO5 |
+| 8 – GDO2 | RF RX | GPIO10 |
+
+## RF protocol
+
+- Modulation: **OOK**, 434 MHz
+- `symbol_rate: 5000`
+- `filter_bandwidth: 325kHz`
+
+The code can capture the frames sent by the original remote when reception mode is enabled. The captured frames must then be copied into the `## SCRIPTS ##` section of the code, for each of the 9 buttons (speeds 1 to 6, light, rotation direction and stop).
 
 ## Installation
 
-1. Installer [ESPHome](https://esphome.io/)
-2. Copier `secrets.yaml.example` en `secrets.yaml` et renseigner tes identifiants Wi-Fi (ce fichier est ignoré par Git, ne le committe jamais)
-3. Flasher la config sur l'ESP32 : `esphome run casafan.yaml`
+1. Install [ESPHome](https://esphome.io/).
+2. Copy `secrets.yaml.example` to `secrets.yaml` and fill in your Wi-Fi credentials.
 
-## Licence
+   > [!WARNING]
+   > `secrets.yaml` is ignored by Git. Never commit it.
 
-MIT — libre réutilisation, avec mention de la source appréciée.
+3. Flash the configuration to the ESP32:
+
+   ```bash
+   esphome run casafan.yaml
+   ```
+
+4. Open the device's web interface in a browser, using either the IP address assigned by your DHCP server or <http://casafan-cc1101-c3mini.local/>.
+
+## Capturing the remote codes
+
+1. In the device's web interface, enable **reception mode**.
+2. Press each of the 9 buttons on the original remote: speeds 1 to 6, light, rotation direction and stop.
+3. Copy the captured frames into a text file.
+4. Paste them into the `## SCRIPTS ##` section of the code, then re-flash the ESP.
+
+## Home Assistant integration
+
+Once the ESP is flashed and online, add it to Home Assistant after installing the [ESPHome Device Builder](https://esphome.io/install/getting-started/) add-on.
+
+## License
+
+[MIT](LICENSE): free to reuse, with credit to the source appreciated.
