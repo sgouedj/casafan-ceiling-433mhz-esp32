@@ -6,7 +6,7 @@
 
 Control a **CasaFan Airfusion Climate LD-CD52BN** ceiling fan from **Home Assistant** (and Alexa) by replacing its original 434 MHz RF remote with an **ESP32** connected to a **CC1101** radio module, running **ESPHome**.
 
-(images/casafan-ceiling.webp)
+![Ceilling](images/casafan-ceiling.webp)
 
 ## Table of contents
 
