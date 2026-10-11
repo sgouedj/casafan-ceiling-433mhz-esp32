@@ -6,6 +6,8 @@
 
 Control a **CasaFan Airfusion Climate LD-CD52BN** ceiling fan from **Home Assistant** (and Alexa) by replacing its original 434 MHz RF remote with an **ESP32** connected to a **CC1101** radio module, running **ESPHome**.
 
+(images/remote-RH787RX.png)
+
 ## Table of contents
 
 - [Overview](#overview)
@@ -51,6 +53,8 @@ This project reproduces the remote's RF frames from an ESP32, so the fan can be 
 
 That makes **9 distinct RF commands** in total.
 
+![Remote RH787RX](images/remote-RH787RX.png)
+
 ## Hardware
 
 - [EBYTE **E07-M1101D-TH** CC1101 module (SMA antenna)](images/cc1101-TI-sma.jpg) 
@@ -95,7 +99,7 @@ The code can capture the frames sent by the original remote when reception mode 
 
 ## Capturing the remote codes
 
-1. In the device's web interface, enable **reception mode**.
+1. In the [device's web interface](images/webserver1.png), enable [**reception mode**.](images/webserver2.png)
 2. Press each of the 9 buttons on the original remote: speeds 1 to 6, light, rotation direction and stop.
 3. Copy the captured frames into a text file.
 4. Paste them into the `## SCRIPTS ##` section of the code, then re-flash the ESP.
