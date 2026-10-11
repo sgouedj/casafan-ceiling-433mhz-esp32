@@ -107,7 +107,7 @@ The code can capture the frames sent by the original remote when reception mode 
 ## Home Assistant integration
 
 Once the ESP is flashed and online, add it to Home Assistant after installing the [ESPHome Device Builder](https://esphome.io/install/getting-started/) add-on.
-
+[![Home Assistant integration](images/cablage.png)](images/cablage.png)
 ## License
 
 [MIT](LICENSE): free to reuse, with credit to the source appreciated.
