@@ -1,5 +1,5 @@
 # ============================================================
-# CASAFAN CC1101 - ESP32-C3 mini
+# CASAFAN CC1101 E07-M1101D-TH → →  ESP32-C3 mini
 # TRANSMITTER & RECEIVER RF 
 # ============================================================
 # CC1101	Fonction	ESP32-C3
@@ -16,16 +16,21 @@
 esphome:
   name: casafan-cc1101-c3mini
   friendly_name: CasaFan CC1101 C3mini
-  comment: "ESP32-C3 with CC1101 TI SMA - TRANSMITTER & RECEIVER RF for ceiling Casafan"
+  comment: >
+    CC1101 Texas Instrument SMA antenna with ESP32-C3 with :
+    Transmitter & Receiver RF for ceiling Casafan/Anderic/Airfusion/Lucci/... models
   area:
-    id: "chambre_parentale"
-    name: "Chambre"
+    id: "master_bedroom"
+    name: "master bedroom"
+    
   on_boot:
     priority: -100
     then:
+      - delay: 500ms
+      - cc1101.set_idle
       - lambda: |-
           id(system_ready) = true;
-          
+        
 esp32:
   variant: ESP32C3
   flash_size: 4MB
@@ -33,12 +38,10 @@ esp32:
     type: esp-idf
 
 logger:
-  level: DEBUG
+  level: VERBOSE   ## Choose DEBUG or VERBOSE for Receiver/capture mode
   baud_rate: 115200
 
-api:
-  encryption:
-    key: "kOm2BVfrvTIFRqewdr2IZrSxT8DoNIXhC9HAKO/ETcA="
+api: #homeassistant
 
 ota:
   - platform: esphome
@@ -47,22 +50,23 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
-  ap:
-    ssid: "casa Fallback Hotspot"
-    password: "reX0UMeZ4Ph3"
-
 web_server:
   port: 80
+  version: 3
 
 captive_portal:
   
 globals:
+
   - id: system_ready
     type: bool
     restore_value: no
-    initial_value: 'false'
+    initial_value: "false"
 
-
+  - id: casafan_starting
+    type: bool
+    restore_value: no
+    initial_value: "true"
 
 # ============================================================
 # SPI CC1101
@@ -98,8 +102,9 @@ remote_receiver:
   tolerance: 60%
   filter: 10us
   idle: 32767us
-  buffer_size: 1kb
-  rmt_symbols: 64
+  buffer_size: 4kb
+  rmt_symbols: 48
+  receive_symbols: 48
 
 # ============================================================
 # EMETTEUR RF - TRANSMITTER- GPIO7
@@ -126,7 +131,184 @@ remote_transmitter:
     then:
       - cc1101.set_idle
       - remote_transmitter.digital_write: true
+      #- cc1101.begin_rx
+
+# ============================================================
+# OUTPUT
+# ============================================================
+
+output:
+
+  # onboard blue led ESP32-C3-mini (STATUS_LED)
+  - platform: gpio
+    id: STATUS_LED
+    pin: GPIO8
+    inverted: true
+
+  # Virtual light output
+  - platform: template
+    id: casafan_light_output
+    type: binary
+    write_action:
+      - if:
+          condition:
+            lambda: 'return id(system_ready);'
+          then:
+            - script.execute: casafan_lumiere
+
+
+# ============================================================
+# CEILING FAN 
+# ============================================================
+
+fan:
+
+  - platform: template
+    name: "Casafan Ventilateur"
+    id: casafan_fan
+    icon: "mdi:ceiling-fan"
+    web_server:
+      sorting_weight: 20
+    restore_mode: ALWAYS_OFF
+
+    # ON = V1
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(casafan_starting);'
+            then:
+              - script.execute: casafan_v1
+
+    # OFF = STOP
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(casafan_starting);'
+            then:
+              - script.execute: casafan_stop
+
+# ============================================================
+# CEILING LIGHT
+# ============================================================
+
+light:
+
+  - platform: binary
+    name: "Casafan Lumière"
+    id: casafan_light
+    icon: "mdi:lightbulb"
+    output: casafan_light_output
+    restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_weight: 10
+
+# ============================================================
+# SWITCH TEMPLATE
+# CEILING ROTATION
+# ============================================================
+
+switch:
+  - platform: template
+    name: "Casafan Rotation"
+    id: casafan_rotation_switch
+    icon: "mdi:rotate-3d"
+    web_server:
+      sorting_weight: 40
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+    turn_on_action:
+      - if:
+          condition:
+            lambda: 'return id(system_ready);'
+          then:
+            - script.execute: casafan_rotation
+
+    turn_off_action:
+      - if:
+          condition:
+            lambda: 'return id(system_ready);'
+          then:
+            - script.execute: casafan_rotation
+              
+# ============================================================
+# SWITCH TEMPLATE
+# Pour forcer le mode CC1101 en réception pour capturer les trames de la télécommande originale. 
+# Par défaut, CC1101 en mode Emission
+# ============================================================
+  - platform: template
+    name: "Casafan Mode réception"
+    id: casafan_rx_mode
+    web_server:
+      sorting_weight: 100
+    icon: "mdi:antenna"
+    restore_mode: ALWAYS_OFF
+    optimistic: true
+
+    turn_on_action:
+      - cc1101.set_idle
+      - delay: 50ms
       - cc1101.begin_rx
+
+    turn_off_action:
+      - cc1101.set_idle            
+              
+# ============================================================
+#  BUTTON TEMPLATE
+#  Speed control buttons 1--6
+# ============================================================
+
+button:
+  - platform: template
+    name: "Casafan Vitesse 1"
+    icon: "mdi:numeric-1-circle"
+    web_server:
+      sorting_weight: 31
+    on_press:
+      - script.execute: casafan_v1
+
+  - platform: template
+    name: "Casafan Vitesse 2"
+    icon: "mdi:numeric-2-circle"
+    web_server:
+      sorting_weight: 32
+    on_press:
+      - script.execute: casafan_v2
+
+  - platform: template
+    name: "Casafan Vitesse 3"
+    icon: "mdi:numeric-3-circle"
+    web_server:
+      sorting_weight: 33
+    on_press:
+      - script.execute: casafan_v3
+
+  - platform: template
+    name: "Casafan Vitesse 4"
+    icon: "mdi:numeric-4-circle"
+    web_server:
+      sorting_weight: 34
+    on_press:
+      - script.execute: casafan_v4
+
+  - platform: template
+    name: "Casafan Vitesse 5"
+    icon: "mdi:numeric-5-circle"
+    web_server:
+      sorting_weight: 35
+    on_press:
+      - script.execute: casafan_v5
+
+  - platform: template
+    name: "Casafan Vitesse 6"
+    icon: "mdi:numeric-6-circle"
+    web_server:
+      sorting_weight: 36
+    on_press:
+      - script.execute: casafan_v6
+
 
 # ============================================================
 # SCRIPTS
@@ -414,7 +596,7 @@ script:
 
 
   # ----------------------------------------------------------
-  # LUMIERE
+  # CEILING FAN LIGHT
   # ----------------------------------------------------------
 
   - id: casafan_lumiere
@@ -489,137 +671,3 @@ script:
             wait_time: 11.7ms
 
 
-# ============================================================
-# SORTIES
-# ============================================================
-
-output:
-
-  # LED BLUE intégrée (STATUS_LED)
-  - platform: gpio
-    id: STATUS_LED
-    pin: GPIO8
-    inverted: true
-
-  # Sortie virtuelle de la lumière
-  - platform: template
-    id: casafan_light_output
-    type: binary
-    write_action:
-      - script.execute: casafan_lumiere
-
-
-# ============================================================
-# VENTILATEUR
-# ============================================================
-
-fan:
-
-  - platform: template
-    name: "Casafan Ventilateur"
-    id: casafan_fan
-    icon: "mdi:ceiling-fan"
-
-    restore_mode: ALWAYS_OFF
-
-    # ON = V1
-    on_turn_on:
-      then:
-        - script.execute: casafan_v1
-
-    # OFF = STOP
-    on_turn_off:
-      then:
-        - script.execute: casafan_stop
-
-
-# ============================================================
-# LUMIERE
-# ============================================================
-
-light:
-
-  - platform: binary
-    name: "Casafan Lumière"
-    id: casafan_light
-    output: casafan_light_output
-    restore_mode: RESTORE_DEFAULT_OFF
-
-
-# ============================================================
-# ROTATION
-# ============================================================
-
-switch:
-  - platform: template
-    name: "Casafan Rotation"
-    id: casafan_rotation_switch
-    icon: "mdi:rotate-3d"
-    optimistic: true
-    restore_mode: ALWAYS_OFF
-
-    turn_on_action:
-      - if:
-          condition:
-            lambda: 'return id(system_ready);'
-          then:
-            - script.execute: casafan_rotation
-
-    turn_off_action:
-      - if:
-          condition:
-            lambda: 'return id(system_ready);'
-          then:
-            - script.execute: casafan_rotation
-# ============================================================
-# 6 boutons vitesse
-# ============================================================
-
-button:
-  - platform: template
-    name: "Casafan Vitesse 1"
-    icon: "mdi:numeric-1-circle"
-    on_press:
-      - script.execute: casafan_v1
-
-  - platform: template
-    name: "Casafan Vitesse 2"
-    icon: "mdi:numeric-2-circle"
-    on_press:
-      - script.execute: casafan_v2
-
-  - platform: template
-    name: "Casafan Vitesse 3"
-    icon: "mdi:numeric-3-circle"
-    on_press:
-      - script.execute: casafan_v3
-
-  - platform: template
-    name: "Casafan Vitesse 4"
-    icon: "mdi:numeric-4-circle"
-    on_press:
-      - script.execute: casafan_v4
-
-  - platform: template
-    name: "Casafan Vitesse 5"
-    icon: "mdi:numeric-5-circle"
-    on_press:
-      - script.execute: casafan_v5
-
-  - platform: template
-    name: "Casafan Vitesse 6"
-    icon: "mdi:numeric-6-circle"
-    on_press:
-      - script.execute: casafan_v6
-
-  - platform: template
-    name: "Casafan Mode réception"
-    icon: "mdi:antenna"
-    on_press:
-      - cc1101.begin_rx
-
-  - platform: template
-    name: "Casafan Mode émission"
-    icon: "mdi:antenna-off"
-    on_press:
-      - cc1101.set_idle
