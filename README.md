@@ -53,8 +53,8 @@ That makes **9 distinct RF commands** in total.
 
 ## Hardware
 
-- [EBYTE **E07-M1101D-TH** CC1101 module (SMA antenna)](images/cc1101 TI sma.jpg) 
-- ESP32-C3 Super Mini** (16 pins, USB-C)
+- [EBYTE **E07-M1101D-TH** CC1101 module (SMA antenna)](images/cc1101-TI-sma.jpg) 
+- [ESP32-C3 Super Mini** (16 pins, USB-C)](images/ESP32-C3-Super-Mini-Pinout.png) 
 
 ## Wiring
 
